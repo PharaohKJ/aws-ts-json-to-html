@@ -2,8 +2,10 @@
 require "json"
 require "bigdecimal"
 
-file = File.read(ARGV[0] || 'asrOutput-25.json')
+file = File.read(ARGV[0])
 h = JSON.parse(file)
+
+audio = ARGV[1]
 
 class Record
   attr_reader :start_time, :end_time, :raw_record, :speaker
@@ -73,13 +75,28 @@ speakers = records.map(&:speaker).uniq
 
 diff_records = records.each_cons(2).to_a.map { |r1, r2| RecordPair.new(r1, r2) }
 
-puts '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>parse-ts-json</title></head><body>'
+java_script = <<JS
+<script>
+function seek(t) {
+    var element = document.getElementById('target_audio');
+    element.currentTime = t
+}
+</script>
+JS
 
+java_script = '' if audio.nil?
+
+puts '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>parse-ts-json</title></head><body>'
+puts java_script
 puts '<h1>話者</h1>'
 puts speakers.join(', ')
 puts '<br/>'
 puts speakers.count
 puts '<hr>'
+if audio
+  puts '<audio controls src="IP.mp4" id="target_audio"></audio>'
+  puts '<hr>'
+end
 
 texts = ["#{seconds_to_time(0)} || "]
 
@@ -90,7 +107,8 @@ texts = diff_records.each_with_object(texts) do |r, o|
     color = 0xff - (0xff * r2['confidence'].to_f).to_i
     score = format('%#<s>3.2f', s: (r2['confidence'].to_f * 100.0).round(2))
     title = "#{t_s} | #{score} / 100.00"
-    o << %(<span style="color:##{color.to_i.to_s(16).rjust(2, '0')}0000;" title="#{title}">)
+    call_js = audio.nil? ? '' : %(onclick="seek(#{sec})")
+    o << %(<span style="color:##{color.to_i.to_s(16).rjust(2, '0')}0000;" title="#{title}" #{call_js}>)
     o << r2['content']
     o << %(</span>)
     o << "<br>" if r2['content'].include?('。')
